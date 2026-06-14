@@ -290,12 +290,13 @@ try {
 }
 
 if (savedTocWidth) {
-  document.documentElement.style.setProperty("--toc-width", savedTocWidth + "px");
+  applyTocWidth(Number(savedTocWidth));
 }
 
 function applyTocWidth(clientX) {
-  const width = Math.min(Math.max(clientX, 200), 520);
+  const width = Math.min(Math.max(clientX, 0), 520);
   document.documentElement.style.setProperty("--toc-width", width + "px");
+  document.body.classList.toggle("toc-closed", width <= 16);
   try {
     localStorage.setItem("toc-width", String(width));
   } catch {
@@ -404,11 +405,22 @@ body {
 .toc {
   position: sticky;
   top: 0;
+  min-width: 0;
   height: 100vh;
   overflow: auto;
   padding: 24px 18px;
   border-right: 1px solid var(--border);
   background: var(--toc-bg);
+}
+
+.toc-closed .toc {
+  overflow: hidden;
+  padding: 0;
+  border-right: 0;
+}
+
+.toc-closed .toc > * {
+  visibility: hidden;
 }
 
 .toc-resizer {
