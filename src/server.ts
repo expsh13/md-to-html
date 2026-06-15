@@ -146,35 +146,17 @@ function renderPage({ title, content, headings }: RenderPageOptions): string {
 }
 
 function renderToc(headings: Heading[]): string {
-  if (headings.length === 0) {
+  const visibleHeadings = headings.filter((heading) => heading.level <= 3);
+
+  if (visibleHeadings.length === 0) {
     return `<p class="toc-empty">No headings</p>`;
   }
 
-  let html = "";
-  const stack: number[] = [];
+  const items = visibleHeadings.map((heading) => {
+    return `<li class="toc-item level-${heading.level}"><a href="#${heading.id}" data-heading-id="${heading.id}"><span class="toc-level">h${heading.level}</span>${escapeHtml(heading.text)}</a></li>`;
+  });
 
-  for (const heading of headings) {
-    while (stack.length > 0 && stack[stack.length - 1] >= heading.level) {
-      html += "</li></ol>";
-      stack.pop();
-    }
-
-    if (stack.length === 0 || stack[stack.length - 1] < heading.level) {
-      html += `<ol class="toc-list level-${heading.level}">`;
-      stack.push(heading.level);
-    } else {
-      html += "</li>";
-    }
-
-    html += `<li><a href="#${heading.id}" data-heading-id="${heading.id}">${escapeHtml(heading.text)}</a>`;
-  }
-
-  while (stack.length > 0) {
-    html += "</li></ol>";
-    stack.pop();
-  }
-
-  return html;
+  return `<ol class="toc-list">${items.join("")}</ol>`;
 }
 
 function headingText(token: MarkdownToken | undefined): string {
@@ -248,6 +230,8 @@ const resizer = document.querySelector(".toc-resizer");
 const headings = links
   .map((link) => document.getElementById(link.dataset.headingId))
   .filter(Boolean);
+const visibleHeadingLevels = new Set(["H1", "H2", "H3"]);
+const activeHeadings = headings.filter((heading) => visibleHeadingLevels.has(heading.tagName));
 
 let isResizingToc = false;
 let savedTocWidth = null;
@@ -312,19 +296,13 @@ function setActive(id) {
   if (!link) return;
 
   link.classList.add("active");
-  let parent = link.closest("ol")?.parentElement;
-  while (parent && parent.matches("li")) {
-    const parentLink = parent.querySelector(":scope > a");
-    parentLink?.classList.add("active-parent");
-    parent = parent.closest("ol")?.parentElement;
-  }
 }
 
 function updateActiveHeading() {
-  let current = headings[0];
+  let current = activeHeadings[0];
   const activeLine = Math.round(window.innerHeight * 0.38);
 
-  for (const heading of headings) {
+  for (const heading of activeHeadings) {
     if (heading.getBoundingClientRect().top <= activeLine) {
       current = heading;
     } else {
@@ -424,13 +402,20 @@ body.resizing-toc {
   list-style: none;
 }
 
-.toc-list .toc-list {
-  margin-top: 2px;
-  padding-left: 14px;
-}
-
 .toc li {
   margin: 2px 0;
+}
+
+.toc-item.level-1,
+.toc-item.level-2 {
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+.toc-item.level-1:first-child,
+.toc-item.level-2:first-child {
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .toc a {
@@ -441,6 +426,15 @@ body.resizing-toc {
   text-decoration: none;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.toc-level {
+  display: inline-block;
+  width: 24px;
+  margin-right: 8px;
+  color: #98a2b3;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .toc a:hover {
