@@ -81,7 +81,7 @@ function scrollActiveTocLinkIntoView(link) {
   const targetOffset = linkRect.top - tocRect.top - toc.clientHeight / 2 + link.clientHeight / 2;
   toc.scrollTo({
     top: toc.scrollTop + targetOffset,
-    behavior: "smooth"
+    behavior: "smooth",
   });
 }
 

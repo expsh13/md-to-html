@@ -40,12 +40,22 @@ export function startServer({ filePath, host, port }: StartServerOptions): Serve
 
       const markdown = await fs.readFile(absoluteFilePath, "utf8");
       const document = renderMarkdown(markdown);
-      send(res, 200, "text/html; charset=utf-8", renderPage({
-        title: path.basename(absoluteFilePath),
-        ...document
-      }));
+      send(
+        res,
+        200,
+        "text/html; charset=utf-8",
+        renderPage({
+          title: path.basename(absoluteFilePath),
+          ...document,
+        }),
+      );
     } catch (error) {
-      send(res, 500, "text/plain; charset=utf-8", error instanceof Error ? error.message : String(error));
+      send(
+        res,
+        500,
+        "text/plain; charset=utf-8",
+        error instanceof Error ? error.message : String(error),
+      );
     }
   });
 
@@ -98,7 +108,11 @@ function renderToc(headings: Heading[]): string {
   return `<ol class="toc-list">${items.join("")}</ol>`;
 }
 
-async function sendStaticFile(res: ServerResponse, root: string, relativePath: string): Promise<void> {
+async function sendStaticFile(
+  res: ServerResponse,
+  root: string,
+  relativePath: string,
+): Promise<void> {
   const filePath = path.resolve(root, relativePath);
   const rootPath = path.resolve(root);
 

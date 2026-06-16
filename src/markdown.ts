@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import type Token from "markdown-it/lib/token.mjs";
 
 export type Heading = {
   id: string;
@@ -11,24 +12,14 @@ type RenderMarkdownResult = {
   headings: Heading[];
 };
 
-type MarkdownToken = {
-  type: string;
-  tag: string;
-  content: string;
-  children?: MarkdownToken[] | null;
-  meta?: Record<string, string>;
-  attrGet(name: string): string | null;
-  attrSet(name: string, value: string): void;
-};
-
 const markdownRenderer = new MarkdownIt({
   html: false,
   linkify: false,
-  typographer: false
+  typographer: false,
 });
 
 markdownRenderer.renderer.rules.heading_open = (tokens, index, options, _env, self) => {
-  const token = tokens[index] as MarkdownToken;
+  const token = tokens[index];
   const level = Number(token.tag.slice(1));
   const id = token.attrGet("id") ?? "";
   const text = token.meta?.headingText ?? "";
@@ -40,7 +31,7 @@ markdownRenderer.renderer.rules.heading_open = (tokens, index, options, _env, se
 export function renderMarkdown(markdown: string): RenderMarkdownResult {
   const headings: Heading[] = [];
   const usedIds = new Map<string, number>();
-  const tokens = markdownRenderer.parse(markdown, {}) as MarkdownToken[];
+  const tokens = markdownRenderer.parse(markdown, {});
 
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
@@ -56,10 +47,13 @@ export function renderMarkdown(markdown: string): RenderMarkdownResult {
     headings.push({ id, level, text });
   }
 
-  return { content: markdownRenderer.renderer.render(tokens, markdownRenderer.options, {}), headings };
+  return {
+    content: markdownRenderer.renderer.render(tokens, markdownRenderer.options, {}),
+    headings,
+  };
 }
 
-function headingText(token: MarkdownToken | undefined): string {
+function headingText(token: Token | undefined): string {
   if (!token) return "";
   if (token.children) {
     return token.children.map(headingText).join("");
@@ -71,13 +65,14 @@ function headingText(token: MarkdownToken | undefined): string {
 }
 
 function uniqueSlug(text: string, usedIds: Map<string, number>): string {
-  const base = text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "") || "heading";
+  const base =
+    text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}\s-]/gu, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "heading";
   const count = usedIds.get(base) ?? 0;
   usedIds.set(base, count + 1);
   return count === 0 ? base : `${base}-${count + 1}`;

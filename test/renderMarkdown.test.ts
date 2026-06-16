@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect, test } from "vite-plus/test";
 
 import { renderMarkdown } from "../src/markdown.ts";
 
@@ -10,14 +9,14 @@ test("extracts headings and renders heading anchors", () => {
 
 ### Detail`);
 
-  assert.deepEqual(result.headings.map(({ level, text }) => ({ level, text })), [
+  expect(result.headings.map(({ level, text }) => ({ level, text }))).toEqual([
     { level: 1, text: "Title" },
     { level: 2, text: "Section" },
-    { level: 3, text: "Detail" }
+    { level: 3, text: "Detail" },
   ]);
-  assert.match(result.content, /<a class="heading-anchor"[^>]*>#<\/a>Title/);
-  assert.match(result.content, /<a class="heading-anchor"[^>]*>##<\/a>Section/);
-  assert.match(result.content, /<a class="heading-anchor"[^>]*>###<\/a>Detail/);
+  expect(result.content).toMatch(/<a class="heading-anchor"[^>]*>#<\/a>Title/);
+  expect(result.content).toMatch(/<a class="heading-anchor"[^>]*>##<\/a>Section/);
+  expect(result.content).toMatch(/<a class="heading-anchor"[^>]*>###<\/a>Detail/);
 });
 
 test("keeps duplicate heading ids unique", () => {
@@ -25,5 +24,5 @@ test("keeps duplicate heading ids unique", () => {
 
 ## Same`);
 
-  assert.deepEqual(result.headings.map((heading) => heading.id), ["same", "same-2"]);
+  expect(result.headings.map((heading) => heading.id)).toEqual(["same", "same-2"]);
 });

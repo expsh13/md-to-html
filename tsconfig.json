@@ -5,7 +5,8 @@
     "moduleResolution": "nodenext",
     "noEmit": true,
     "strict": true,
-    "target": "ES2024"
+    "target": "ES2024",
+    "types": ["node"]
   },
   "include": ["bin/**/*.ts", "src/**/*.ts", "test/**/*.ts"]
 }
