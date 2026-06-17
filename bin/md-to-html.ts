@@ -1,33 +1,18 @@
 #!/usr/bin/env node
 
+import { parseStartOptions, usage } from "../src/cli.ts";
 import { startServer } from "../src/server.ts";
 
-const args = process.argv.slice(2).filter((arg) => arg !== "--");
+const result = parseStartOptions(process.argv.slice(2));
 
-if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
-  console.log("Usage: md-to-html <file.md> [--port 4321] [--host 127.0.0.1]");
-  console.log("Example: pnpm start -- sample.md");
-  process.exit(args.length === 0 ? 1 : 0);
+if (result.kind === "help") {
+  console.log(usage.join("\n"));
+  process.exit(result.exitCode);
 }
 
-const filePath = args[0];
-const port = Number(readOption(args, "--port") ?? 4321);
-const host = readOption(args, "--host") ?? "127.0.0.1";
-
-if (!filePath) {
-  console.error("Markdown file path is required.");
+if (result.kind === "error") {
+  console.error(result.message);
   process.exit(1);
 }
 
-if (!Number.isInteger(port) || port <= 0) {
-  console.error("Invalid --port value.");
-  process.exit(1);
-}
-
-startServer({ filePath, host, port });
-
-function readOption(args: string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  if (index === -1) return undefined;
-  return args[index + 1];
-}
+startServer(result.options);

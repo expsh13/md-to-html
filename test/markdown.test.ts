@@ -26,3 +26,31 @@ test("keeps duplicate heading ids unique", () => {
 
   expect(result.headings.map((heading) => heading.id)).toEqual(["same", "same-2"]);
 });
+
+test("extracts heading text from inline markdown", () => {
+  const result = renderMarkdown("## **Bold** `Code` [Link](https://example.com)");
+
+  expect(result.headings).toEqual([
+    {
+      id: "bold-code-link",
+      level: 2,
+      text: "Bold Code Link",
+    },
+  ]);
+});
+
+test("renders common markdown blocks through markdown-it", () => {
+  const result = renderMarkdown(`| Name | Value |
+| --- | --- |
+| A | 1 |
+
+\`\`\`ts
+const value = 1;
+\`\`\`
+
+![Alt text](./assets/sample-image.svg)`);
+
+  expect(result.content).toContain("<table>");
+  expect(result.content).toContain('<code class="language-ts">');
+  expect(result.content).toContain('<img src="./assets/sample-image.svg" alt="Alt text">');
+});
