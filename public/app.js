@@ -1,6 +1,6 @@
 const resizer = document.querySelector(".toc-resizer");
 const visibleHeadingLevels = new Set(["H1", "H2", "H3"]);
-const scrollStorageKey = "md-to-html-scroll-y";
+const headingStorageKey = "md-to-html-heading-id";
 
 try {
   history.scrollRestoration = "manual";
@@ -11,7 +11,7 @@ try {
 const reloadEvents = new EventSource("/events");
 reloadEvents.addEventListener("reload", () => {
   if (document.body.classList.contains("editing")) return;
-  reloadWithScrollRestoration();
+  reloadWithHeadingRestoration();
 });
 
 let isResizingToc = false;
@@ -19,8 +19,8 @@ let savedTocWidth = null;
 let isEditing = false;
 let saveTimer = null;
 let latestSave = Promise.resolve();
-let previewScrollY = window.scrollY;
-let previewScrollRatio = getScrollRatio(window.scrollY);
+let currentHeadingId = null;
+let transitionHeadingId = null;
 let links = [];
 let headings = [];
 let activeHeadings = [];
@@ -90,6 +90,7 @@ function setActive(id) {
   const link = document.querySelector('.toc a[data-heading-id="' + CSS.escape(id) + '"]');
   if (!link) return;
 
+  currentHeadingId = id;
   link.classList.add("active");
   scrollActiveTocLinkIntoView(link);
 }
@@ -125,7 +126,7 @@ function updateActiveHeading() {
 window.addEventListener("scroll", handleScroll, { passive: true });
 window.addEventListener("resize", updateActiveHeading);
 refreshHeadingReferences();
-restoreScrollPosition();
+restoreHeadingPosition();
 updateActiveHeading();
 
 modeToggle?.addEventListener("click", async () => {
@@ -137,9 +138,34 @@ modeToggle?.addEventListener("click", async () => {
   await enterEditMode();
 });
 
+modeToggle?.addEventListener("pointerdown", () => {
+  if (isEditing) return;
+  transitionHeadingId = headingIdFromViewport() ?? activeTocHeadingId() ?? currentHeadingId;
+});
+
 editor?.addEventListener("input", () => {
   syncEditorHeight();
+  updateActiveEditorHeading();
   queueSave();
+});
+
+editor?.addEventListener("scroll", () => {
+  updateActiveEditorHeading();
+});
+
+tocNav?.addEventListener("click", (event) => {
+  if (!isEditing) return;
+
+  const link = event.target.closest("a[data-heading-id]");
+  if (!link) return;
+
+  event.preventDefault();
+  const headingPosition = findMarkdownHeadingPosition(editor.value, link.dataset.headingId);
+  if (!headingPosition) return;
+
+  editor.focus({ preventScroll: true });
+  scrollToEditorLine(headingPosition.line);
+  setActive(link.dataset.headingId);
 });
 
 async function enterEditMode() {
@@ -153,10 +179,12 @@ async function enterEditMode() {
   }
 
   editor.value = await response.text();
-  const scrollRatio = getScrollRatio(previewScrollY);
-  previewScrollRatio = scrollRatio;
-  editor.selectionStart = 0;
-  editor.selectionEnd = 0;
+  const headingId = headingIdFromViewport() ?? activeTocHeadingId() ?? currentHeadingId;
+  transitionHeadingId = headingId;
+  const headingPosition = headingId ? findMarkdownHeadingPosition(editor.value, headingId) : null;
+  const cursorPosition = headingPosition?.offset ?? 0;
+  editor.selectionStart = cursorPosition;
+  editor.selectionEnd = cursorPosition;
   isEditing = true;
   document.body.classList.add("editing");
   article.hidden = true;
@@ -166,13 +194,14 @@ async function enterEditMode() {
   modeToggle.setAttribute("aria-pressed", "true");
   setSaveStatus("編集可能");
   editor.focus({ preventScroll: true });
-  restoreScrollRatio(scrollRatio);
+  scrollToEditorLine(headingPosition?.line ?? 0);
+  updateActiveEditorHeading();
 }
 
 async function leaveEditMode() {
   if (!editor || !article || !modeToggle) return;
 
-  const scrollRatio = previewScrollRatio;
+  const headingId = editorHeadingIdFromViewport() ?? transitionHeadingId ?? currentHeadingId;
   clearTimeout(saveTimer);
   await latestSave;
   await saveSource();
@@ -190,12 +219,11 @@ async function leaveEditMode() {
   editor.hidden = true;
   modeToggle.textContent = "編集";
   modeToggle.setAttribute("aria-pressed", "false");
-  const restore = () => {
-    restoreScrollRatio(scrollRatio);
-    updateActiveHeading();
+  const transition = () => {
+    scrollToHeading(headingId);
   };
-  requestAnimationFrame(restore);
-  setTimeout(restore, 100);
+  requestAnimationFrame(transition);
+  setTimeout(transition, 100);
 }
 
 function queueSave() {
@@ -232,21 +260,15 @@ function setSaveStatus(message) {
 }
 
 function handleScroll() {
-  if (!isEditing) {
-    previewScrollY = window.scrollY;
-    previewScrollRatio = getScrollRatio(window.scrollY);
-  }
+  if (isEditing) return;
   updateActiveHeading();
 }
 
-function getScrollRatio(scrollY) {
-  const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
-  return scrollY / maxScroll;
-}
-
-function restoreScrollRatio(ratio) {
-  const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
-  window.scrollTo({ top: maxScroll * ratio, behavior: "auto" });
+function updateActiveEditorHeading() {
+  const headingId = editorHeadingIdFromViewport();
+  if (headingId) {
+    setActive(headingId);
+  }
 }
 
 async function fetchContent() {
@@ -264,38 +286,167 @@ function refreshHeadingReferences() {
   activeHeadings = headings.filter((heading) => visibleHeadingLevels.has(heading.tagName));
 }
 
-function syncEditorHeight() {
-  if (!editor) return;
-  editor.style.height = "auto";
-  editor.style.height = editor.scrollHeight + "px";
+function activeTocHeadingId() {
+  return document.querySelector(".toc a.active")?.dataset.headingId ?? null;
 }
 
-function reloadWithScrollRestoration(scrollY = window.scrollY) {
+function headingIdFromViewport() {
+  let current = activeHeadings[0];
+  const activeLine = Math.round(window.innerHeight * 0.38);
+
+  for (const heading of activeHeadings) {
+    if (heading.getBoundingClientRect().top <= activeLine) {
+      current = heading;
+    } else {
+      break;
+    }
+  }
+
+  return current?.id ?? null;
+}
+
+function editorHeadingIdFromViewport() {
+  if (!editor) return null;
+
+  const styles = getComputedStyle(editor);
+  const lineHeight = Number.parseFloat(styles.lineHeight) || 24;
+  const line = Math.max(
+    Math.floor((editor.scrollTop + editor.clientHeight * 0.38) / lineHeight),
+    0,
+  );
+  const offset = offsetAtMarkdownLine(editor.value, line);
+
+  return findMarkdownHeadingIdBeforeOffset(editor.value, offset);
+}
+
+function offsetAtMarkdownLine(markdown, line) {
+  const lines = markdown.split("\n");
+  let offset = 0;
+
+  for (let index = 0; index < Math.min(line, lines.length); index += 1) {
+    offset += lines[index].length + 1;
+  }
+
+  return offset;
+}
+
+function findMarkdownHeadingIdBeforeOffset(markdown, offset) {
+  let current = null;
+
+  for (const heading of markdownHeadingPositions(markdown)) {
+    if (heading.offset > offset) break;
+    if (heading.level <= 3) {
+      current = heading.id;
+    }
+  }
+
+  return current;
+}
+
+function scrollToHeading(id, behavior = "auto") {
+  if (!id) return;
+
+  const heading = document.getElementById(id);
+  if (!heading) return;
+
+  heading.scrollIntoView({ behavior, block: "start" });
+  setActive(id);
+}
+
+function scrollToEditorLine(line) {
+  if (!editor) return;
+
+  const styles = getComputedStyle(editor);
+  const lineHeight = Number.parseFloat(styles.lineHeight) || 24;
+  window.scrollTo({ top: 0, behavior: "auto" });
+  editor.scrollTop = Math.max(line * lineHeight - editor.clientHeight * 0.28, 0);
+}
+
+function findMarkdownHeadingPosition(markdown, headingId) {
+  return markdownHeadingPositions(markdown).find((heading) => heading.id === headingId) ?? null;
+}
+
+function markdownHeadingPositions(markdown) {
+  const positions = [];
+  const usedIds = new Map();
+  const lines = markdown.split("\n");
+  let offset = 0;
+
+  for (let line = 0; line < lines.length; line += 1) {
+    const text = lines[line];
+    const match = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(text);
+
+    if (match) {
+      const level = match[1].length;
+      const headingText = markdownHeadingText(match[2]);
+      positions.push({
+        id: uniqueSlug(headingText, usedIds),
+        level,
+        line,
+        offset,
+      });
+    }
+
+    offset += text.length + 1;
+  }
+
+  return positions;
+}
+
+function markdownHeadingText(markdown) {
+  return markdown
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[*_~]/g, "")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+}
+
+function uniqueSlug(text, usedIds) {
+  const base =
+    text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}\s-]/gu, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "heading";
+  const count = usedIds.get(base) ?? 0;
+  usedIds.set(base, count + 1);
+  return count === 0 ? base : `${base}-${count + 1}`;
+}
+
+function syncEditorHeight() {
+  if (!editor) return;
+  editor.style.height = "";
+}
+
+function reloadWithHeadingRestoration(headingId = currentHeadingId) {
   try {
-    localStorage.setItem(scrollStorageKey, String(scrollY));
+    if (headingId) {
+      localStorage.setItem(headingStorageKey, headingId);
+    }
   } catch {
     // Ignore storage failures; reload still works.
   }
   window.location.reload();
 }
 
-function restoreScrollPosition() {
-  let storedScrollY = null;
+function restoreHeadingPosition() {
+  let storedHeadingId = null;
 
   try {
-    storedScrollY = localStorage.getItem(scrollStorageKey);
-    localStorage.removeItem(scrollStorageKey);
+    storedHeadingId = localStorage.getItem(headingStorageKey);
+    localStorage.removeItem(headingStorageKey);
   } catch {
-    storedScrollY = null;
+    storedHeadingId = null;
   }
 
-  if (storedScrollY === null) return;
+  if (!storedHeadingId) return;
 
-  const scrollY = Number(storedScrollY);
   const restore = () => {
-    window.scrollTo({ top: scrollY, behavior: "auto" });
-    previewScrollY = window.scrollY;
-    updateActiveHeading();
+    scrollToHeading(storedHeadingId, "auto");
   };
 
   requestAnimationFrame(restore);

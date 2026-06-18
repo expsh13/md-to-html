@@ -16,7 +16,6 @@
 
 html {
   overflow-anchor: none;
-  scroll-behavior: smooth;
 }
 
 body {
@@ -180,11 +179,12 @@ main {
 .markdown-editor {
   display: block;
   width: 100%;
+  height: calc(100vh - 128px);
   min-height: calc(100vh - 160px);
   padding: 0;
   border: 0;
   border-radius: 0;
-  resize: vertical;
+  resize: none;
   color: var(--text);
   background: #ffffff;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -213,7 +213,7 @@ h6 {
   position: relative;
   margin: 2em 0 0.7em;
   line-height: 1.25;
-  scroll-margin-top: 24px;
+  scroll-margin-top: 72px;
 }
 
 h1 {
