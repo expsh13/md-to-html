@@ -139,7 +139,6 @@ body.resizing-toc {
 
 main {
   width: 100%;
-  max-width: 920px;
   padding: 40px 48px 80px;
 }
 
@@ -149,9 +148,11 @@ main {
   z-index: 1;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
-  margin: -8px 0 24px;
-  padding: 8px 0;
+  margin: -40px -48px 32px;
+  padding: 14px 48px;
+  border-bottom: 1px solid var(--border);
   background: var(--bg);
 }
 
@@ -202,6 +203,7 @@ main {
 
 article {
   width: 100%;
+  max-width: 920px;
 }
 
 h1,
@@ -319,5 +321,10 @@ th {
 
   main {
     padding: 28px 20px 56px;
+  }
+
+  .viewer-toolbar {
+    margin: -28px -20px 24px;
+    padding: 12px 20px;
   }
 }
