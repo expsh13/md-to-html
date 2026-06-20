@@ -130,17 +130,23 @@ restoreHeadingPosition();
 updateActiveHeading();
 
 modeToggle?.addEventListener("click", async () => {
-  if (isEditing) {
-    await leaveEditMode();
-    return;
-  }
-
-  await enterEditMode();
+  await toggleEditMode();
 });
 
 modeToggle?.addEventListener("pointerdown", () => {
   if (isEditing) return;
   transitionHeadingId = headingIdFromViewport() ?? activeTocHeadingId() ?? currentHeadingId;
+});
+
+window.addEventListener("keydown", async (event) => {
+  if (event.key.toLowerCase() !== "e") return;
+  if (!event.metaKey && !event.ctrlKey) return;
+
+  event.preventDefault();
+  if (!isEditing) {
+    transitionHeadingId = headingIdFromViewport() ?? activeTocHeadingId() ?? currentHeadingId;
+  }
+  await toggleEditMode();
 });
 
 editor?.addEventListener("input", () => {
@@ -167,6 +173,15 @@ tocNav?.addEventListener("click", (event) => {
   scrollToEditorLine(headingPosition.line);
   setActive(link.dataset.headingId);
 });
+
+async function toggleEditMode() {
+  if (isEditing) {
+    await leaveEditMode();
+    return;
+  }
+
+  await enterEditMode();
+}
 
 async function enterEditMode() {
   if (!editor || !article || !modeToggle) return;
