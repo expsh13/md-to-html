@@ -4,10 +4,14 @@ import http, { type IncomingMessage, type Server, type ServerResponse } from "no
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { renderMarkdown } from "./markdown.ts";
-import { renderPage, renderToc } from "./page.ts";
+import { renderMarkdown } from "./markdown.js";
+import { renderPage, renderToc } from "./page.js";
 
-const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot =
+  path.basename(path.dirname(moduleDirectory)) === "dist"
+    ? path.resolve(moduleDirectory, "../..")
+    : path.resolve(moduleDirectory, "..");
 const maxSourceBytes = 5 * 1024 * 1024;
 
 export type StartServerOptions = {

@@ -1,19 +1,20 @@
 {
   "name": "@expsh13/md-live",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local live Markdown viewer and editor with table-of-contents navigation.",
   "type": "module",
   "bin": {
-    "md-live": "./bin/md-live.ts"
+    "md-live": "./dist/bin/md-live.js"
   },
   "files": [
     "assets",
-    "bin",
+    "dist",
     "public",
-    "src",
     "README.md"
   ],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm build",
     "start": "node ./bin/md-live.ts",
     "check": "vp check",
     "format": "vp fmt --write",
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^25.9.3",
+    "typescript": "^6.0.3",
     "vite-plus": "^0.1.24"
   }
 }

@@ -1,4 +1,4 @@
-import type { Heading } from "./markdown.ts";
+import type { Heading } from "./markdown.js";
 
 type RenderPageOptions = {
   title: string;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { parseStartOptions, usage } from "../src/cli.ts";
+import { parseStartOptions, usage } from "../src/cli.js";
 
 const result = parseStartOptions(process.argv.slice(2));
 
@@ -14,5 +14,5 @@ if (result.kind === "error") {
   process.exit(1);
 }
 
-const { startServer } = await import("../src/server.ts");
+const { startServer } = await import("../src/server.js");
 startServer(result.options);

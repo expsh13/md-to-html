@@ -1,4 +1,4 @@
-import type { StartServerOptions } from "./server.ts";
+import type { StartServerOptions } from "./server.js";
 
 export type ParseStartOptionsResult =
   | {
