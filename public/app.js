@@ -21,8 +21,9 @@ let saveTimer = null;
 let latestSave = Promise.resolve();
 let currentHeadingId = null;
 let transitionHeadingId = null;
-let links = [];
-let headings = [];
+let isProgrammaticScroll = false;
+let programmaticScrollTimer = null;
+let allHeadings = [];
 let activeHeadings = [];
 
 const article = document.querySelector("article");
@@ -87,10 +88,15 @@ function setActive(id) {
     node.classList.remove("active", "active-parent");
   });
 
-  const link = document.querySelector('.toc a[data-heading-id="' + CSS.escape(id) + '"]');
+  const visibleHeadingId = visibleHeadingIdFor(id);
+  if (!visibleHeadingId) return;
+
+  const link = document.querySelector(
+    '.toc a[data-heading-id="' + CSS.escape(visibleHeadingId) + '"]',
+  );
   if (!link) return;
 
-  currentHeadingId = id;
+  currentHeadingId = visibleHeadingId;
   link.classList.add("active");
   scrollActiveTocLinkIntoView(link);
 }
@@ -160,18 +166,36 @@ editor?.addEventListener("scroll", () => {
 });
 
 tocNav?.addEventListener("click", (event) => {
-  if (!isEditing) return;
-
   const link = event.target.closest("a[data-heading-id]");
   if (!link) return;
 
   event.preventDefault();
-  const headingPosition = findMarkdownHeadingPosition(editor.value, link.dataset.headingId);
+  const headingId = link.dataset.headingId;
+
+  if (!isEditing) {
+    history.pushState(null, "", link.getAttribute("href"));
+    scrollToHeading(headingId);
+    return;
+  }
+
+  const headingPosition = findMarkdownHeadingPosition(editor.value, headingId);
   if (!headingPosition) return;
 
   editor.focus({ preventScroll: true });
   scrollToEditorLine(headingPosition.line);
-  setActive(link.dataset.headingId);
+  setActive(headingId);
+});
+
+article?.addEventListener("click", (event) => {
+  const link = event.target.closest(".heading-anchor");
+  if (!link) return;
+
+  const href = link.getAttribute("href");
+  if (!href?.startsWith("#")) return;
+
+  event.preventDefault();
+  history.pushState(null, "", href);
+  scrollToHeading(decodeURIComponent(href.slice(1)));
 });
 
 async function toggleEditMode() {
@@ -276,6 +300,7 @@ function setSaveStatus(message) {
 
 function handleScroll() {
   if (isEditing) return;
+  if (isProgrammaticScroll) return;
   updateActiveHeading();
 }
 
@@ -296,9 +321,12 @@ async function fetchContent() {
 }
 
 function refreshHeadingReferences() {
-  links = Array.from(document.querySelectorAll(".toc a[data-heading-id]"));
-  headings = links.map((link) => document.getElementById(link.dataset.headingId)).filter(Boolean);
-  activeHeadings = headings.filter((heading) => visibleHeadingLevels.has(heading.tagName));
+  allHeadings = Array.from(
+    document.querySelectorAll(
+      "article h1[id], article h2[id], article h3[id], article h4[id], article h5[id], article h6[id]",
+    ),
+  );
+  activeHeadings = allHeadings.filter((heading) => visibleHeadingLevels.has(heading.tagName));
 }
 
 function activeTocHeadingId() {
@@ -364,8 +392,36 @@ function scrollToHeading(id, behavior = "auto") {
   const heading = document.getElementById(id);
   if (!heading) return;
 
+  suspendScrollActiveUpdate();
   heading.scrollIntoView({ behavior, block: "start" });
   setActive(id);
+}
+
+function suspendScrollActiveUpdate() {
+  isProgrammaticScroll = true;
+  clearTimeout(programmaticScrollTimer);
+  programmaticScrollTimer = setTimeout(() => {
+    isProgrammaticScroll = false;
+  }, 200);
+}
+
+function visibleHeadingIdFor(id) {
+  if (document.querySelector('.toc a[data-heading-id="' + CSS.escape(id) + '"]')) {
+    return id;
+  }
+
+  let current = null;
+
+  for (const heading of allHeadings) {
+    if (visibleHeadingLevels.has(heading.tagName)) {
+      current = heading.id;
+    }
+    if (heading.id === id) {
+      return current;
+    }
+  }
+
+  return current;
 }
 
 function scrollToEditorLine(line) {
